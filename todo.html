@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>sdhvoi 的年历 Todo</title>
+  <style>
+    body {
+      font-family: 'Arial Rounded MT Bold', 'PingFang SC', sans-serif;
+      background: #fff0f5;
+      margin: 0;
+      padding: 1rem;
+    }
+    .container {
+      max-width: 600px;
+      margin: auto;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 1.5rem;
+      border-radius: 20px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+    h1 {
+      text-align: center;
+      color: #d94f70;
+    }
+    .controls {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    select, .summary-btn {
+      font-size: 1rem;
+      padding: 0.4rem;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      cursor: pointer;
+    }
+    .calendar {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 0.3rem;
+      text-align: center;
+      margin-top: 0.5rem;
+    }
+    .calendar .day-label {
+      font-weight: bold;
+      background: none;
+      color: #888;
+    }
+    .calendar div {
+      background: #ffe4ec;
+      padding: 0.6rem;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    .calendar .has-task {
+      background: #ffb6c1;
+      font-weight: bold;
+      box-shadow: 0 0 0 2px #f06292 inset;
+    }
+    .calendar .selected {
+      background: #f06292;
+      color: white;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 0.8rem;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      margin-top: 1rem;
+    }
+    ul {
+      list-style: none;
+      padding-left: 0;
+      margin-top: 1rem;
+    }
+    li {
+      background: #e8f5e9;
+      padding: 0.6rem 1rem;
+      border-radius: 10px;
+      margin-bottom: 0.6rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      animation: fadeIn 0.4s ease-in;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    button {
+      background: #ff8a80;
+      border: none;
+      color: white;
+      padding: 0.3rem 0.7rem;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .reminder-box {
+      background: #fff3cd;
+      border: 1px solid #ffeeba;
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      margin-bottom: 1rem;
+      color: #856404;
+      font-size: 0.95rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>sdhvoi 的年历 Todo</h1>
+    <div class="reminder-box" id="reminderBox"></div>
+    <div class="controls">
+      <select id="yearSelect"></select>
+      <select id="monthSelect"></select>
+      <button class="summary-btn" onclick="showSummary()">本月任务总览</button>
+    </div>
+    <div id="calendar" class="calendar"></div>
+    <input type="text" id="taskInput" placeholder="为选中日期添加任务，按回车保存" />
+    <ul id="taskList"></ul>
+  </div>
+  <script>
+    const calendar = document.getElementById("calendar");
+    const taskInput = document.getElementById("taskInput");
+    const taskList = document.getElementById("taskList");
+    const yearSelect = document.getElementById("yearSelect");
+    const monthSelect = document.getElementById("monthSelect");
+    const reminderBox = document.getElementById("reminderBox");
+
+    const today = new Date();
+    let selectedDate = today.getDate();
+    let selectedMonth = today.getMonth();
+    let selectedYear = today.getFullYear();
+
+    const weekLabels = ["日", "一", "二", "三", "四", "五", "六"];
+
+    function initSelectors() {
+      for (let y = 2022; y <= 2032; y++) {
+        let option = document.createElement("option");
+        option.value = y;
+        option.textContent = y + "年";
+        if (y === selectedYear) option.selected = true;
+        yearSelect.appendChild(option);
+      }
+      for (let m = 0; m < 12; m++) {
+        let option = document.createElement("option");
+        option.value = m;
+        option.textContent = (m + 1) + "月";
+        if (m === selectedMonth) option.selected = true;
+        monthSelect.appendChild(option);
+      }
+      yearSelect.onchange = () => {
+        selectedYear = parseInt(yearSelect.value);
+        renderCalendar();
+      };
+      monthSelect.onchange = () => {
+        selectedMonth = parseInt(monthSelect.value);
+        renderCalendar();
+      };
+    }
+
+    function renderCalendar() {
+      calendar.innerHTML = "";
+      weekLabels.forEach(label => {
+        const div = document.createElement("div");
+        div.textContent = label;
+        div.className = "day-label";
+        calendar.appendChild(div);
+      });
+
+      const firstDay = new Date(selectedYear, selectedMonth, 1).getDay();
+      const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+
+      for (let i = 0; i < firstDay; i++) {
+        calendar.appendChild(document.createElement("div"));
+      }
+
+      for (let i = 1; i <= daysInMonth; i++) {
+        const div = document.createElement("div");
+        div.textContent = i;
+        const key = `tasks-${selectedYear}-${selectedMonth + 1}-${i}`;
+        if (localStorage.getItem(key) && JSON.parse(localStorage.getItem(key)).length > 0) {
+          div.classList.add("has-task");
+        }
+        if (i === selectedDate) div.classList.add("selected");
+        div.onclick = () => {
+          selectedDate = i;
+          document.querySelectorAll(".calendar div").forEach(d => d.classList.remove("selected"));
+          div.classList.add("selected");
+          renderTasks();
+        };
+        calendar.appendChild(div);
+      }
+    }
+
+    function getStorageKey(year, month, date) {
+      return `tasks-${year}-${month + 1}-${date}`;
+    }
+
+    function renderTasks() {
+      taskList.innerHTML = "";
+      const tasks = JSON.parse(localStorage.getItem(getStorageKey(selectedYear, selectedMonth, selectedDate)) || "[]");
+      tasks.forEach((task, index) => {
+        const li = document.createElement("li");
+        li.textContent = task;
+        const btn = document.createElement("button");
+        btn.textContent = "完成";
+        btn.onclick = () => {
+          tasks.splice(index, 1);
+          localStorage.setItem(getStorageKey(selectedYear, selectedMonth, selectedDate), JSON.stringify(tasks));
+          renderTasks();
+          renderCalendar();
+        };
+        li.appendChild(btn);
+        taskList.appendChild(li);
+      });
+    }
+
+    function showSummary() {
+      let summary = `【${selectedYear}年${selectedMonth + 1}月任务总览】\n`;
+      const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+      let hasTask = false;
+      for (let d = 1; d <= daysInMonth; d++) {
+        const key = getStorageKey(selectedYear, selectedMonth, d);
+        const tasks = JSON.parse(localStorage.getItem(key) || "[]");
+        if (tasks.length > 0) {
+          summary += `${selectedMonth + 1}月${d}日：` + tasks.join("、") + "\n";
+          hasTask = true;
+        }
+      }
+      if (!hasTask) summary += "暂无任务~\n";
+      alert(summary);
+    }
+
+    function showReminders() {
+      const reminders = [];
+      for (let offset of [1, 2]) {
+        const target = new Date();
+        target.setDate(today.getDate() + offset);
+        const key = getStorageKey(target.getFullYear(), target.getMonth(), target.getDate());
+        const tasks = JSON.parse(localStorage.getItem(key) || "[]");
+        if (tasks.length > 0) {
+          reminders.push(`${offset === 1 ? "明天" : "后天"}（${target.getMonth() + 1}月${target.getDate()}日）：` + tasks.join("、"));
+        }
+      }
+      if (reminders.length > 0) {
+        reminderBox.innerHTML = reminders.map(r => `提醒：${r}`).join("<br>");
+      } else {
+        reminderBox.innerHTML = "今天没有即将到来的任务，sdhvoi可以稍微放松一下~";
+      }
+    }
+
+    taskInput.addEventListener("keypress", function (e) {
+      if (e.key === "Enter" && taskInput.value.trim() !== "") {
+        const key = getStorageKey(selectedYear, selectedMonth, selectedDate);
+        const tasks = JSON.parse(localStorage.getItem(key) || "[]");
+        tasks.push(taskInput.value.trim());
+        localStorage.setItem(key, JSON.stringify(tasks));
+        taskInput.value = "";
+        renderTasks();
+        renderCalendar();
+        showReminders();
+      }
+    });
+
+    initSelectors();
+    renderCalendar();
+    renderTasks();
+    showReminders();
+  </script>
+</body>
+</html>
